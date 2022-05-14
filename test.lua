@@ -7,11 +7,14 @@ end)
 
 
 ps.sub_once("hello", function (...)
-    print("I will receive once `hello`", ...)
+    print("I will receive 1 `hello`", ...)
+    ps.pub("hello", "world", 2)
 end)
 
+ps.sub_many("hello", function (...)
+    print("I will receive 3 `hello`", ...)
+end, 3)
 
 
-for i = 1, 3 do
-    ps.pub("hello", "world", i)
-end
+ps.pub("hello", "world", 1)
+ps.pub("hello", "world", 3)

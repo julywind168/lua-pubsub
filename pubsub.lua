@@ -7,42 +7,55 @@ local function event_queue(name)
     return listeners[name]
 end
 
+
+local function copy(list)
+    local new = {}
+    for i,v in ipairs(list) do
+        new[i] = v
+    end
+    return new
+end
+
+
 local processing = false
-local unsub_list = {}
+local defer = {}
 
 -- Interface
 function M.pub(name, ...)
+    if processing then
+        table.insert(defer, {name = name, args = {...}})
+        return
+    end
+
     processing = true
-    local queue = event_queue(name)
-    for _,cb in ipairs(queue) do
-        cb(...)
+    do
+        local queue = copy(event_queue(name))
+        for _,s in ipairs(queue) do
+            if s.active then
+                s.callback(...)
+            end
+        end
     end
     processing = false
 
-    for i = 1, #unsub_list do
-        unsub_list[i]()
-        unsub_list[i] = nil
+    local e = table.remove(defer, 1)
+    if e then
+        M.pub(e.name, table.unpack(e.args))
     end
 end
 
 
 function M.sub(name, callback)
     local queue = event_queue(name)
-    table.insert(queue, callback)
-
-    local function unsub()
-        for i,cb in ipairs(queue) do
-            if cb == callback then
-                return table.remove(queue, i)
-            end
-        end
-    end
+    local subscriber = {active = true, callback = callback}
+    table.insert(queue, subscriber)
 
     return function ()
-        if processing then
-            table.insert(unsub_list, unsub)
-        else
-            unsub()
+        for i,s in ipairs(queue) do
+            if s == subscriber then
+                subscriber.active = false
+                return table.remove(queue, i)
+            end
         end
     end
 end
