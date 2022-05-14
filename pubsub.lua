@@ -1,12 +1,11 @@
 local M = {}
 
-local listeners = {}
+local subscribers = {}
 
-local function event_queue(name)
-    listeners[name] = listeners[name] or {}
-    return listeners[name]
+local function subscriber_queue(name)
+    subscribers[name] = subscribers[name] or {}
+    return subscribers[name]
 end
-
 
 local function copy(list)
     local new = {}
@@ -29,7 +28,7 @@ function M.pub(name, ...)
 
     processing = true
     do
-        local queue = copy(event_queue(name))
+        local queue = copy(subscriber_queue(name))
         for _,s in ipairs(queue) do
             if s.active then
                 s.callback(...)
@@ -46,7 +45,7 @@ end
 
 
 function M.sub(name, callback)
-    local queue = event_queue(name)
+    local queue = subscriber_queue(name)
     local subscriber = {active = true, callback = callback}
     table.insert(queue, subscriber)
 
