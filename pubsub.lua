@@ -7,55 +7,58 @@ local function subscriber_queue(name)
     return subscribers[name]
 end
 
-local function copy(list)
-    local new = {}
-    for i,v in ipairs(list) do
-        new[i] = v
-    end
-    return new
-end
-
 
 local processing = false
 local defer = {}
 
+local destroyed = {}
+
 -- Interface
 function M.pub(name, ...)
     if processing then
-        table.insert(defer, {name = name, args = {...}})
+        table.insert(defer, {name, ...})
         return
     end
 
     processing = true
     do
-        local queue = copy(subscriber_queue(name))
-        for _,s in ipairs(queue) do
-            if s.active then
-                s.callback(...)
+        local queue = subscriber_queue(name)
+        for i,callback in ipairs(queue) do
+            if callback(...) then
+                table.insert(destroyed, i)
             end
+        end
+
+        -- clear
+        for i=#destroyed,1,-1 do
+            table.remove(queue, destroyed[i])
+            destroyed[i] = nil
         end
     end
     processing = false
 
     local e = table.remove(defer, 1)
     if e then
-        M.pub(e.name, table.unpack(e.args))
+        M.pub(table.unpack(e))
     end
 end
 
 
 function M.sub(name, callback)
     local queue = subscriber_queue(name)
-    local subscriber = {active = true, callback = callback}
+
+    local function subscriber(...)
+        if callback then
+            callback(...)
+        else
+            return true
+        end
+    end
+
     table.insert(queue, subscriber)
 
     return function ()
-        for i,s in ipairs(queue) do
-            if s == subscriber then
-                subscriber.active = false
-                return table.remove(queue, i)
-            end
-        end
+        callback = nil
     end
 end
 
